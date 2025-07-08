@@ -16,7 +16,6 @@ SoPDF provides three powerful PDF management tools in one clean, intuitive inter
 
 ### 📁 **Organize Pages**
 - **Visual & Text-based Interface**: Reorder PDF pages with intuitive drag-and-drop or text-based controls
-- **Page Preview**: Double-click any page to see a full preview
 - **Remove & Restore**: Temporarily remove pages and restore them as needed
 - **Smart Status**: Real-time feedback on changes made to your document
 - **Flexible Controls**: Move pages up/down, drag-and-drop reordering, or use keyboard shortcuts
