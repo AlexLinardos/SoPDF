@@ -1,0 +1,5 @@
+# Build dependencies for creating executable
+pyinstaller>=5.13.0
+pillow>=9.0.0
+customtkinter>=5.2.0
+PyPDF2>=3.0.0 
