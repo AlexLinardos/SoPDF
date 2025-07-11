@@ -72,21 +72,11 @@ class OrganizeTab:
         # File info label
         self.organize_file_info = ctk.CTkLabel(
             file_frame,
-            text="No file selected - Page list will appear here",
+            text="No file selected",
             font=ctk.CTkFont(size=14),
             text_color="gray"
         )
         self.organize_file_info.grid(row=0, column=1, padx=10, pady=20, sticky="w")
-        
-        # Preview mode toggle
-        self.preview_toggle = ctk.CTkSwitch(
-            file_frame,
-            text="🖼️ Preview Mode",
-            font=ctk.CTkFont(size=14),
-            state="disabled",
-            command=self.toggle_preview_mode
-        )
-        self.preview_toggle.grid(row=0, column=2, padx=10, pady=20)
         
         # Clear file button
         self.clear_organize_btn = ctk.CTkButton(
@@ -98,7 +88,7 @@ class OrganizeTab:
             state="disabled",
             command=self.clear_organize_file
         )
-        self.clear_organize_btn.grid(row=0, column=3, padx=(10, 20), pady=20)
+        self.clear_organize_btn.grid(row=0, column=2, padx=(10, 20), pady=20)
         
         # Main content frame with controls and page list
         self.content_frame = ctk.CTkFrame(self.tab_frame, corner_radius=8)
@@ -109,15 +99,31 @@ class OrganizeTab:
         # Control buttons frame at top
         controls_frame = ctk.CTkFrame(self.content_frame)
         controls_frame.grid(row=0, column=0, padx=20, pady=(20, 10), sticky="ew")
+        controls_frame.grid_columnconfigure(0, weight=1)
+        
+        # Top row with instructions and preview toggle
+        top_row_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
+        top_row_frame.grid(row=0, column=0, padx=20, pady=10, sticky="ew")
+        top_row_frame.grid_columnconfigure(0, weight=1)
         
         # Instructions label
         self.instructions_label = ctk.CTkLabel(
-            controls_frame,
-            text="🧾 Instructions: Use buttons or drag-and-drop to reorder • Remove/restore pages as needed",
+            top_row_frame,
+            text="🧾 Instructions: Use buttons or drag to reorder • Remove/restore pages as needed",
             font=ctk.CTkFont(size=14),
             text_color="lightblue"
         )
-        self.instructions_label.grid(row=0, column=0, padx=20, pady=10, sticky="w")
+        self.instructions_label.grid(row=0, column=0, padx=0, pady=0, sticky="w")
+        
+        # Preview mode toggle
+        self.preview_toggle = ctk.CTkSwitch(
+            top_row_frame,
+            text="🖼️ Preview Mode",
+            font=ctk.CTkFont(size=14),
+            state="disabled",
+            command=self.toggle_preview_mode
+        )
+        self.preview_toggle.grid(row=0, column=1, padx=(20, 0), pady=0, sticky="e")
         
         # Control buttons
         button_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
@@ -162,25 +168,30 @@ class OrganizeTab:
     
     def toggle_preview_mode(self):
         """Toggle between text and preview modes"""
-        if not self.organize_pdf_path:
-            return
-        
         self.preview_mode = self.preview_toggle.get()
-        
-        # Clear existing content
-        for widget in self.pages_frame.winfo_children():
-            widget.destroy()
         
         # Update instructions
         if self.preview_mode:
             self.instructions_label.configure(
                 text="🖼️ Preview Mode: Drag to reorder • Right-click to remove/restore"
             )
-            self.create_preview_interface()
         else:
             self.instructions_label.configure(
                 text="🧾 Instructions: Use buttons or drag-and-drop to reorder • Remove/restore pages as needed"
             )
+        
+        # Only update interface if a PDF is loaded
+        if not self.organize_pdf_path:
+            return
+        
+        # Clear existing content
+        for widget in self.pages_frame.winfo_children():
+            widget.destroy()
+        
+        # Create appropriate interface
+        if self.preview_mode:
+            self.create_preview_interface()
+        else:
             self.create_text_based_organize_interface()
     
     def select_pdf_for_organize(self):
