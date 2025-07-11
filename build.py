@@ -73,7 +73,7 @@ def check_dependencies():
         print(f"   ✅ PyInstaller {PyInstaller.__version__} installed")
     
     # Check other dependencies
-    dependencies = ['customtkinter', 'PyPDF2', 'PIL']
+    dependencies = ['customtkinter', 'PyPDF2', 'PIL', 'fitz']
     for dep in dependencies:
         try:
             __import__(dep)
@@ -103,11 +103,12 @@ def build_executable():
         '--add-data=assets;assets',     # Include assets folder
         '--add-data=docs;docs',         # Include docs folder
         
-        # Hidden imports for CustomTkinter
+        # Hidden imports for CustomTkinter and PDF processing
         '--hidden-import=customtkinter',
         '--hidden-import=PIL',
         '--hidden-import=PIL._tkinter_finder',
         '--hidden-import=PyPDF2',
+        '--hidden-import=fitz',
         
         # Exclude only obviously unnecessary modules (safe exclusions)
         '--exclude-module=tkinter.test',
@@ -190,7 +191,8 @@ def show_build_info():
         print(f"\n💡 Distribution notes:")
         print(f"   • The .exe file is standalone and doesn't require Python")
         print(f"   • No external dependencies required - fully self-contained")
-        print(f"   • PDF processing uses built-in PyPDF2 library")
+        print(f"   • PDF processing uses PyPDF2 + PyMuPDF libraries")
+        print(f"   • Preview mode included with pure Python PDF rendering")
     else:
         print("\n❌ Build failed - executable not found")
 
@@ -203,9 +205,9 @@ def main():
     clean_build()
     print()
     
-    # Step 2: Skipping Poppler (preview functionality removed)
-    print("📄 PDF preview functionality has been removed from SoPDF")
-    print("   ✅ No external dependencies required for core functionality")
+    # Step 2: PyMuPDF is now included for preview functionality
+    print("📄 PDF preview functionality included via PyMuPDF")
+    print("   ✅ Pure Python PDF rendering - no external binaries required")
     print()
     
     # Step 3: Check dependencies

@@ -131,7 +131,8 @@ class SoPDFApp:
             "width": min(1200, int(screen_width * 0.8)),
             "height": min(900, int(screen_height * 0.8)),
             "x": None,  # Will be calculated for centering
-            "y": None   # Will be calculated for centering
+            "y": None,  # Will be calculated for centering
+            "organize_preview_mode": False  # Default preview mode state
         }
         
         state_file = self.get_state_file_path()
@@ -153,7 +154,8 @@ class SoPDFApp:
                 "width": self.root.winfo_width(),
                 "height": self.root.winfo_height(),
                 "x": self.root.winfo_x(),
-                "y": self.root.winfo_y()
+                "y": self.root.winfo_y(),
+                "organize_preview_mode": self.organize_tab_instance.preview_mode if self.organize_tab_instance else False
             }
             
             state_file = self.get_state_file_path()

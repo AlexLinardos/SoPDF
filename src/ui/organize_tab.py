@@ -9,6 +9,9 @@ import tkinter as tk
 import customtkinter as ctk
 from tkinter import filedialog, messagebox, simpledialog
 from PyPDF2 import PdfReader, PdfWriter
+import fitz  # PyMuPDF
+import io
+from PIL import Image
 
 
 class OrganizeTab:
@@ -24,6 +27,15 @@ class OrganizeTab:
         self.organize_page_order = []  # List of page indices (0-based)
         self.removed_pages = set()  # Set of removed page indices
         self.listbox_drag_data = {"dragging": False, "start_index": None}  # Drag state for listbox
+        
+        # Preview mode variables
+        self.preview_mode = False
+        self.pdf_document = None  # PyMuPDF document
+        self.page_thumbnails = {}  # Cache for page thumbnails
+        self.preview_widgets = {}  # Cache for preview widgets
+        self.selected_pages = set()  # Selected pages in preview mode
+        self.preview_drag_data = {"dragging": False, "start_widget": None, "start_x": 0, "start_y": 0}
+        self.current_drop_target = None  # Track current drop target for visual feedback
         
         self.setup_organize_tab()
     
@@ -66,6 +78,16 @@ class OrganizeTab:
         )
         self.organize_file_info.grid(row=0, column=1, padx=10, pady=20, sticky="w")
         
+        # Preview mode toggle
+        self.preview_toggle = ctk.CTkSwitch(
+            file_frame,
+            text="🖼️ Preview Mode",
+            font=ctk.CTkFont(size=14),
+            state="disabled",
+            command=self.toggle_preview_mode
+        )
+        self.preview_toggle.grid(row=0, column=2, padx=10, pady=20)
+        
         # Clear file button
         self.clear_organize_btn = ctk.CTkButton(
             file_frame,
@@ -76,7 +98,7 @@ class OrganizeTab:
             state="disabled",
             command=self.clear_organize_file
         )
-        self.clear_organize_btn.grid(row=0, column=2, padx=(10, 20), pady=20)
+        self.clear_organize_btn.grid(row=0, column=3, padx=(10, 20), pady=20)
         
         # Main content frame with controls and page list
         self.content_frame = ctk.CTkFrame(self.tab_frame, corner_radius=8)
@@ -89,13 +111,13 @@ class OrganizeTab:
         controls_frame.grid(row=0, column=0, padx=20, pady=(20, 10), sticky="ew")
         
         # Instructions label
-        instructions_label = ctk.CTkLabel(
+        self.instructions_label = ctk.CTkLabel(
             controls_frame,
-            text="🧾 Instructions: Select pages • Use buttons or drag-and-drop to reorder • Remove/restore pages as needed",
+            text="🧾 Instructions: Use buttons or drag-and-drop to reorder • Remove/restore pages as needed",
             font=ctk.CTkFont(size=14),
             text_color="lightblue"
         )
-        instructions_label.grid(row=0, column=0, padx=20, pady=10, sticky="w")
+        self.instructions_label.grid(row=0, column=0, padx=20, pady=10, sticky="w")
         
         # Control buttons
         button_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
@@ -138,6 +160,29 @@ class OrganizeTab:
         self.pages_frame.grid_columnconfigure(0, weight=1)
         self.pages_frame.grid_rowconfigure(0, weight=1)
     
+    def toggle_preview_mode(self):
+        """Toggle between text and preview modes"""
+        if not self.organize_pdf_path:
+            return
+        
+        self.preview_mode = self.preview_toggle.get()
+        
+        # Clear existing content
+        for widget in self.pages_frame.winfo_children():
+            widget.destroy()
+        
+        # Update instructions
+        if self.preview_mode:
+            self.instructions_label.configure(
+                text="🖼️ Preview Mode: Drag to reorder • Right-click to remove/restore"
+            )
+            self.create_preview_interface()
+        else:
+            self.instructions_label.configure(
+                text="🧾 Instructions: Use buttons or drag-and-drop to reorder • Remove/restore pages as needed"
+            )
+            self.create_text_based_organize_interface()
+    
     def select_pdf_for_organize(self):
         """Select a PDF file for text-based organizing"""
         file_types = [("PDF files", "*.pdf"), ("All files", "*.*")]
@@ -166,12 +211,20 @@ class OrganizeTab:
                 self.organize_page_order = list(range(page_count))  # [0, 1, 2, ...]
                 self.removed_pages = set()
                 
+                # Open PDF with PyMuPDF for preview mode
+                self.pdf_document = fitz.open(file_path)
+                self.page_thumbnails = {}  # Clear thumbnail cache
+                self.preview_widgets = {}  # Clear widget cache
+                
                 # Clear existing content
                 for widget in self.pages_frame.winfo_children():
                     widget.destroy()
                 
-                # Create text-based interface
-                self.create_text_based_organize_interface()
+                # Create appropriate interface based on current mode
+                if self.preview_mode:
+                    self.create_preview_interface()
+                else:
+                    self.create_text_based_organize_interface()
                 
                 # Update UI
                 filename = os.path.basename(file_path)
@@ -184,12 +237,36 @@ class OrganizeTab:
                 self.clear_organize_btn.configure(state="normal")
                 self.reset_order_btn.configure(state="normal")
                 self.save_organized_btn.configure(state="normal")
+                self.preview_toggle.configure(state="normal")
+                
+                # Apply saved preview mode state
+                self.apply_saved_preview_state()
                 
                 # Update status
                 self.update_organize_status()
                 
             except Exception as e:
                 messagebox.showerror("Error", f"Error reading PDF file:\n{str(e)}")
+    
+    def apply_saved_preview_state(self):
+        """Apply saved preview mode state when PDF is loaded"""
+        try:
+            # Get saved preview mode state from app
+            if (hasattr(self.app, 'window_state') and 
+                'organize_preview_mode' in self.app.window_state):
+                
+                saved_preview_mode = self.app.window_state['organize_preview_mode']
+                
+                if saved_preview_mode and not self.preview_mode:
+                    # Apply saved state: turn on preview mode
+                    self.preview_toggle.select()
+                    self.toggle_preview_mode()
+                elif not saved_preview_mode and self.preview_mode:
+                    # Apply saved state: turn off preview mode
+                    self.preview_toggle.deselect()
+                    self.toggle_preview_mode()
+        except Exception as e:
+            print(f"Could not apply saved preview state: {e}")
     
     def create_text_based_organize_interface(self):
         """Create text-based interface for page organization"""
@@ -298,6 +375,416 @@ class OrganizeTab:
         # Update the text display
         self.update_text_organize_display()
     
+    def create_preview_interface(self):
+        """Create preview interface with page thumbnails in a grid"""
+        # Create scrollable frame for the preview grid
+        self.preview_scrollable_frame = ctk.CTkScrollableFrame(
+            self.pages_frame,
+            label_text="📁 PDF Pages Preview"
+        )
+        self.preview_scrollable_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+        
+        # Configure grid for responsive layout
+        for i in range(6):  # 6 columns
+            self.preview_scrollable_frame.grid_columnconfigure(i, weight=1)
+        
+        self.update_preview_display()
+    
+    def generate_page_thumbnail(self, page_index, size=(120, 160)):
+        """Generate a thumbnail image for a PDF page using PyMuPDF"""
+        if page_index in self.page_thumbnails:
+            return self.page_thumbnails[page_index]
+        
+        try:
+            # Get page from PyMuPDF document
+            page = self.pdf_document[page_index]
+            
+            # Render page to image
+            zoom = min(size[0] / page.rect.width, size[1] / page.rect.height)
+            mat = fitz.Matrix(zoom, zoom)
+            pix = page.get_pixmap(matrix=mat)
+            
+            # Convert to PIL Image
+            img_data = pix.tobytes("ppm")
+            pil_image = Image.open(io.BytesIO(img_data))
+            
+            # Resize to exact thumbnail size
+            pil_image = pil_image.resize(size, Image.Resampling.LANCZOS)
+            
+            # Convert to CTkImage for better HighDPI support
+            ctk_image = ctk.CTkImage(light_image=pil_image, dark_image=pil_image, size=size)
+            
+            # Cache the thumbnail
+            self.page_thumbnails[page_index] = ctk_image
+            
+            return ctk_image
+        
+        except Exception as e:
+            print(f"Error generating thumbnail for page {page_index}: {e}")
+            # Return a placeholder image
+            placeholder = Image.new('RGB', size, color='lightgray')
+            return ctk.CTkImage(light_image=placeholder, dark_image=placeholder, size=size)
+    
+    def update_preview_display(self):
+        """Update the preview display with current page order"""
+        # Clear existing preview widgets and all children in the scrollable frame
+        for widget_dict in self.preview_widgets.values():
+            if isinstance(widget_dict, dict):
+                for widget in widget_dict.values():
+                    if hasattr(widget, 'destroy'):
+                        widget.destroy()
+        
+        # Also clear any remaining widgets in the scrollable frame (like removed page widgets)
+        for widget in self.preview_scrollable_frame.winfo_children():
+            widget.destroy()
+        
+        self.preview_widgets = {}
+        
+        # Display active pages
+        active_pages = [idx for idx in self.organize_page_order if idx not in self.removed_pages]
+        
+        cols = 6  # Number of columns in grid
+        
+        for i, page_idx in enumerate(active_pages):
+            row = i // cols
+            col = i % cols
+            
+            # Create page frame
+            page_frame = ctk.CTkFrame(
+                self.preview_scrollable_frame,
+                width=140,
+                height=200,
+                corner_radius=8
+            )
+            page_frame.grid(row=row, column=col, padx=5, pady=5, sticky="nsew")
+            page_frame.grid_propagate(False)
+            
+            # Generate thumbnail
+            thumbnail = self.generate_page_thumbnail(page_idx)
+            
+            # Create thumbnail label
+            thumbnail_label = ctk.CTkLabel(
+                page_frame,
+                image=thumbnail,
+                text="",
+                width=120,
+                height=160
+            )
+            thumbnail_label.grid(row=0, column=0, padx=10, pady=(10, 5))
+            
+            # Page info label
+            original_page_num = page_idx + 1
+            current_position = i + 1
+            info_text = f"Page {current_position}\n(OG: {original_page_num})"
+            
+            info_label = ctk.CTkLabel(
+                page_frame,
+                text=info_text,
+                font=ctk.CTkFont(size=11),
+                height=20
+            )
+            info_label.grid(row=1, column=0, padx=5, pady=(0, 10))
+            
+            # Store references
+            self.preview_widgets[page_idx] = {
+                'frame': page_frame,
+                'thumbnail': thumbnail_label,
+                'info': info_label,
+                'position': i
+            }
+            
+            # Bind events for selection and drag-and-drop
+            for widget in [page_frame, thumbnail_label, info_label]:
+                widget.bind("<Button-1>", lambda e, p=page_idx: self.on_preview_page_click(e, p))
+                widget.bind("<Button-3>", lambda e, p=page_idx: self.on_preview_page_right_click(e, p))
+                widget.bind("<B1-Motion>", lambda e, p=page_idx: self.on_preview_page_drag(e, p))
+                widget.bind("<ButtonRelease-1>", lambda e: self.on_preview_page_drop(e))
+                # Add hover effects
+                widget.bind("<Enter>", lambda e, p=page_idx: self.on_preview_page_hover(e, p))
+                widget.bind("<Leave>", lambda e, p=page_idx: self.on_preview_page_leave(e, p))
+        
+        # Add removed pages section if any
+        if self.removed_pages:
+            removed_row = (len(active_pages) // cols) + 1
+            
+            # Removed pages header
+            removed_header = ctk.CTkLabel(
+                self.preview_scrollable_frame,
+                text="🗑️ REMOVED PAGES",
+                font=ctk.CTkFont(size=16, weight="bold"),
+                text_color="orange"
+            )
+            removed_header.grid(row=removed_row, column=0, columnspan=cols, padx=5, pady=(20, 10), sticky="ew")
+            
+            # Display removed pages
+            for i, page_idx in enumerate(sorted(self.removed_pages)):
+                row = removed_row + 1 + (i // cols)
+                col = i % cols
+                
+                # Create removed page frame (grayed out)
+                removed_frame = ctk.CTkFrame(
+                    self.preview_scrollable_frame,
+                    width=140,
+                    height=200,
+                    corner_radius=8,
+                    fg_color="gray30"
+                )
+                removed_frame.grid(row=row, column=col, padx=5, pady=5, sticky="nsew")
+                removed_frame.grid_propagate(False)
+                
+                # Generate thumbnail (grayed out)
+                thumbnail = self.generate_page_thumbnail(page_idx)
+                
+                thumbnail_label = ctk.CTkLabel(
+                    removed_frame,
+                    image=thumbnail,
+                    text="",
+                    width=120,
+                    height=160
+                )
+                thumbnail_label.grid(row=0, column=0, padx=10, pady=(10, 5))
+                
+                # Removed page info
+                original_page_num = page_idx + 1
+                info_text = f"❌ REMOVED\nPage {original_page_num}"
+                
+                info_label = ctk.CTkLabel(
+                    removed_frame,
+                    text=info_text,
+                    font=ctk.CTkFont(size=11),
+                    text_color="orange",
+                    height=20
+                )
+                info_label.grid(row=1, column=0, padx=5, pady=(0, 10))
+                
+                # Bind right-click for restore
+                for widget in [removed_frame, thumbnail_label, info_label]:
+                    widget.bind("<Button-3>", lambda e, p=page_idx: self.on_preview_removed_page_right_click(e, p))
+    
+    def on_preview_page_click(self, event, page_idx):
+        """Handle click on preview page to initialize drag"""
+        # Initialize drag data
+        self.preview_drag_data = {
+            "dragging": False, 
+            "start_widget": page_idx,
+            "start_x": event.x_root,
+            "start_y": event.y_root
+        }
+    
+    def on_preview_page_right_click(self, event, page_idx):
+        """Handle right-click on preview page for context menu"""
+        # Create context menu
+        context_menu = tk.Menu(self.app.root, tearoff=0)
+        
+        original_page_num = page_idx + 1
+        context_menu.add_command(
+            label=f"Remove Page {original_page_num}",
+            command=lambda: self.preview_remove_page(page_idx)
+        )
+        
+        try:
+            context_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            context_menu.grab_release()
+    
+    def on_preview_removed_page_right_click(self, event, page_idx):
+        """Handle right-click on removed page for restore"""
+        # Create context menu
+        context_menu = tk.Menu(self.app.root, tearoff=0)
+        
+        original_page_num = page_idx + 1
+        context_menu.add_command(
+            label=f"Restore Page {original_page_num}",
+            command=lambda: self.preview_restore_page(page_idx)
+        )
+        
+        try:
+            context_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            context_menu.grab_release()
+    
+    def on_preview_page_drag(self, event, page_idx):
+        """Handle dragging in preview mode"""
+        if (self.preview_drag_data["start_widget"] == page_idx and 
+            not self.preview_drag_data["dragging"]):
+            
+            # Check if we've moved enough to start dragging (minimum threshold)
+            dx = abs(event.x_root - self.preview_drag_data["start_x"])
+            dy = abs(event.y_root - self.preview_drag_data["start_y"])
+            
+            if dx > 5 or dy > 5:  # Minimum movement threshold
+                self.preview_drag_data["dragging"] = True
+                # Visual feedback for dragging
+                if page_idx in self.preview_widgets:
+                    self.preview_widgets[page_idx]['frame'].configure(border_width=2, border_color="orange")
+                try:
+                    event.widget.configure(cursor="fleur")
+                except:
+                    pass  # Some widgets may not support cursor changes
+        
+        # Update drop target highlighting during drag
+        if self.preview_drag_data["dragging"] and self.preview_drag_data["start_widget"] == page_idx:
+            self.update_drop_target_highlight(event)
+    
+    def update_drop_target_highlight(self, event):
+        """Update visual highlighting of drop target during drag"""
+        # Find which page frame the mouse is currently over
+        new_drop_target = None
+        
+        try:
+            for page_idx, widgets in self.preview_widgets.items():
+                # Skip the page being dragged and removed pages
+                if (page_idx == self.preview_drag_data["start_widget"] or 
+                    page_idx in self.removed_pages):
+                    continue
+                
+                frame_widget = widgets['frame']
+                frame_x = frame_widget.winfo_rootx()
+                frame_y = frame_widget.winfo_rooty()
+                frame_width = frame_widget.winfo_width()
+                frame_height = frame_widget.winfo_height()
+                
+                # Check if mouse is within this frame's bounds
+                if (frame_x <= event.x_root <= frame_x + frame_width and 
+                    frame_y <= event.y_root <= frame_y + frame_height):
+                    new_drop_target = page_idx
+                    break
+        
+        except Exception as e:
+            # Ignore errors during drag operations
+            pass
+        
+        # Update highlighting if drop target changed
+        if new_drop_target != self.current_drop_target:
+            # Clear previous drop target highlight
+            if (self.current_drop_target is not None and 
+                self.current_drop_target in self.preview_widgets):
+                self.preview_widgets[self.current_drop_target]['frame'].configure(
+                    border_width=0
+                )
+            
+            # Set new drop target highlight
+            if (new_drop_target is not None and 
+                new_drop_target in self.preview_widgets):
+                self.preview_widgets[new_drop_target]['frame'].configure(
+                    border_width=2, 
+                    border_color="lightgreen"
+                )
+            
+            self.current_drop_target = new_drop_target
+    
+    def on_preview_page_drop(self, event):
+        """Handle drop in preview mode"""
+        if self.preview_drag_data["dragging"]:
+            try:
+                # Reset cursor
+                event.widget.configure(cursor="")
+            except:
+                pass
+            
+            # Reset visual feedback for the dragged item
+            if (self.preview_drag_data["start_widget"] is not None and 
+                self.preview_drag_data["start_widget"] in self.preview_widgets):
+                # Reset border to normal
+                self.preview_widgets[self.preview_drag_data["start_widget"]]['frame'].configure(border_width=0)
+            
+            # Clear drop target highlight
+            if (self.current_drop_target is not None and 
+                self.current_drop_target in self.preview_widgets):
+                self.preview_widgets[self.current_drop_target]['frame'].configure(border_width=0)
+            self.current_drop_target = None
+            
+            # Find drop target by checking all page frames
+            drop_target_page = None
+            
+            # Get the widget at the current mouse position
+            try:
+                widget_at_cursor = self.preview_scrollable_frame.winfo_containing(event.x_root, event.y_root)
+                
+                # Check if the cursor is over any page frame
+                for page_idx, widgets in self.preview_widgets.items():
+                    frame_widget = widgets['frame']
+                    # Check if the mouse is within the bounds of this frame
+                    frame_x = frame_widget.winfo_rootx()
+                    frame_y = frame_widget.winfo_rooty()
+                    frame_width = frame_widget.winfo_width()
+                    frame_height = frame_widget.winfo_height()
+                    
+                    if (frame_x <= event.x_root <= frame_x + frame_width and 
+                        frame_y <= event.y_root <= frame_y + frame_height):
+                        drop_target_page = page_idx
+                        break
+                        
+            except Exception as e:
+                print(f"Drop detection error: {e}")
+            
+            # Perform reorder if valid drop target
+            if (drop_target_page is not None and 
+                self.preview_drag_data["start_widget"] is not None and
+                drop_target_page != self.preview_drag_data["start_widget"] and
+                drop_target_page not in self.removed_pages):
+                
+                self.preview_reorder_pages(self.preview_drag_data["start_widget"], drop_target_page)
+        
+        # Reset drag data
+        self.preview_drag_data = {"dragging": False, "start_widget": None, "start_x": 0, "start_y": 0}
+    
+    def preview_reorder_pages(self, from_page, to_page):
+        """Reorder pages in preview mode"""
+        # Get current active pages
+        active_pages = [idx for idx in self.organize_page_order if idx not in self.removed_pages]
+        
+        from_pos = active_pages.index(from_page)
+        to_pos = active_pages.index(to_page)
+        
+        # Remove from_page from its current position in organize_page_order
+        current_position = self.organize_page_order.index(from_page)
+        self.organize_page_order.pop(current_position)
+        
+        # Find new insertion position
+        target_position = self.organize_page_order.index(to_page)
+        if from_pos < to_pos:
+            # Moving forward - insert after target
+            self.organize_page_order.insert(target_position + 1, from_page)
+        else:
+            # Moving backward - insert before target
+            self.organize_page_order.insert(target_position, from_page)
+        
+        # Update display
+        self.update_preview_display()
+        self.update_organize_status()
+    
+    def preview_remove_page(self, page_idx):
+        """Remove a page in preview mode"""
+        original_page_num = page_idx + 1
+        result = messagebox.askyesno(
+            "Remove Page",
+            f"Remove page {original_page_num}?\n\nThis can be undone by right-clicking the removed page."
+        )
+        
+        if result:
+            self.removed_pages.add(page_idx)
+            self.update_preview_display()
+            self.update_organize_status()
+    
+    def preview_restore_page(self, page_idx):
+        """Restore a removed page in preview mode"""
+        self.removed_pages.remove(page_idx)
+        self.update_preview_display()
+        self.update_organize_status()
+    
+    def on_preview_page_hover(self, event, page_idx):
+        """Handle hover over preview page"""
+        if (page_idx in self.preview_widgets and 
+            not self.preview_drag_data["dragging"]):
+            self.preview_widgets[page_idx]['frame'].configure(border_width=1, border_color="gray50")
+    
+    def on_preview_page_leave(self, event, page_idx):
+        """Handle leaving preview page"""
+        if (page_idx in self.preview_widgets and 
+            not self.preview_drag_data["dragging"]):
+            self.preview_widgets[page_idx]['frame'].configure(border_width=0)
+    
     def clear_organize_file(self):
         """Clear the selected PDF file"""
         self.organize_pdf_path = None
@@ -305,6 +792,20 @@ class OrganizeTab:
         self.organize_page_order = []
         self.removed_pages = set()
         self.listbox_drag_data = {"dragging": False, "start_index": None}
+        
+        # Clear preview mode variables
+        if self.pdf_document:
+            self.pdf_document.close()
+        self.pdf_document = None
+        self.page_thumbnails = {}
+        self.preview_widgets = {}
+        self.selected_pages = set()
+        self.preview_drag_data = {"dragging": False, "start_widget": None, "start_x": 0, "start_y": 0}
+        self.current_drop_target = None
+        
+        # Reset preview mode toggle
+        self.preview_toggle.deselect()
+        self.preview_mode = False
         
         # Clear all interface elements
         for widget in self.pages_frame.winfo_children():
@@ -315,10 +816,11 @@ class OrganizeTab:
             delattr(self, 'text_organize_listbox')
         
         # Update UI
-        self.organize_file_info.configure(text="No file selected - Page list will appear here", text_color="gray")
+        self.organize_file_info.configure(text="No file selected", text_color="gray")
         self.clear_organize_btn.configure(state="disabled")
         self.reset_order_btn.configure(state="disabled")
         self.save_organized_btn.configure(state="disabled")
+        self.preview_toggle.configure(state="disabled")
         self.organize_status.configure(text="No file loaded", text_color="gray")
     
     def reset_page_order(self):
@@ -335,9 +837,12 @@ class OrganizeTab:
             # Reset to original order
             self.organize_page_order = list(range(len(self.organize_pages)))
             self.removed_pages = set()
+
             
-            # Update text display
-            if hasattr(self, 'text_organize_listbox'):
+            # Update appropriate display
+            if self.preview_mode:
+                self.update_preview_display()
+            elif hasattr(self, 'text_organize_listbox'):
                 self.update_text_organize_display()
             
             self.update_organize_status()
