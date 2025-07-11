@@ -37,10 +37,12 @@ class MergeTab:
         )
         title_label.grid(row=0, column=0, padx=20, pady=(20, 10), sticky="ew")
         
-        # Main content frame (now scrollable)
-        content_frame = ctk.CTkScrollableFrame(self.tab_frame, corner_radius=8)
-        content_frame.grid(row=1, column=0, padx=20, pady=(10, 20), sticky="nsew")
-        content_frame.grid_columnconfigure(1, weight=1)
+        # Main content frame
+        content_frame = ctk.CTkFrame(self.tab_frame, corner_radius=8)
+        content_frame.grid(row=1, column=0, padx=10, pady=(5, 10), sticky="nsew")
+        content_frame.grid_columnconfigure(0, weight=0)  # Buttons column - fixed width
+        content_frame.grid_columnconfigure(1, weight=1)  # List column - expandable
+        content_frame.grid_columnconfigure(2, weight=0)  # Merge column - fixed width
         content_frame.grid_rowconfigure(1, weight=1)
         
         # File selection section
@@ -49,11 +51,11 @@ class MergeTab:
             text="Select PDF Files to Merge:",
             font=ctk.CTkFont(size=18, weight="bold")
         )
-        file_section_label.grid(row=0, column=0, columnspan=3, padx=20, pady=(20, 10), sticky="w")
+        file_section_label.grid(row=0, column=0, columnspan=3, padx=10, pady=(10, 5), sticky="w")
         
         # Buttons frame
         buttons_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
-        buttons_frame.grid(row=1, column=0, padx=(20, 10), pady=10, sticky="ns")
+        buttons_frame.grid(row=1, column=0, padx=(10, 5), pady=10, sticky="ns")
         
         # Add files button
         self.add_files_btn = ctk.CTkButton(
@@ -93,7 +95,7 @@ class MergeTab:
         # Move up button
         self.move_up_btn = ctk.CTkButton(
             buttons_frame,
-            text="⬆️Move Up",
+            text="⬆ Move Up",
             width=160,
             height=45,
             font=ctk.CTkFont(size=14),
@@ -105,7 +107,7 @@ class MergeTab:
         # Move down button
         self.move_down_btn = ctk.CTkButton(
             buttons_frame,
-            text="⬇️Move Down",
+            text="⬇ Move Down",
             width=160,
             height=45,
             font=ctk.CTkFont(size=14),
@@ -116,8 +118,9 @@ class MergeTab:
         
         # File list frame
         list_frame = ctk.CTkFrame(content_frame)
-        list_frame.grid(row=1, column=1, padx=10, pady=10, sticky="nsew")
-        list_frame.grid_columnconfigure(0, weight=1)
+        list_frame.grid(row=1, column=1, padx=5, pady=10, sticky="nsew")
+        list_frame.grid_columnconfigure(0, weight=1)  # Listbox column - expandable
+        list_frame.grid_columnconfigure(1, weight=0)  # Scrollbar column - fixed width
         list_frame.grid_rowconfigure(0, weight=1)
         
         # File listbox
@@ -131,17 +134,17 @@ class MergeTab:
             borderwidth=0,
             highlightthickness=0
         )
-        self.file_listbox.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+        self.file_listbox.grid(row=0, column=0, padx=5, pady=5, sticky="nsew")
         self.file_listbox.bind('<<ListboxSelect>>', self.on_file_select)
         
         # Scrollbar for listbox
         scrollbar = ctk.CTkScrollbar(list_frame, command=self.file_listbox.yview)
-        scrollbar.grid(row=0, column=1, padx=(0, 10), pady=10, sticky="ns")
+        scrollbar.grid(row=0, column=1, padx=(0, 5), pady=5, sticky="ns")
         self.file_listbox.configure(yscrollcommand=scrollbar.set)
         
         # Merge section
         merge_frame = ctk.CTkFrame(content_frame)
-        merge_frame.grid(row=1, column=2, padx=(10, 20), pady=10, sticky="ns")
+        merge_frame.grid(row=1, column=2, padx=(5, 10), pady=10, sticky="ns")
         
         # Status label
         self.status_label = ctk.CTkLabel(
