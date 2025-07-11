@@ -15,10 +15,12 @@
 SoPDF provides three powerful PDF management tools in one clean, intuitive interface:
 
 ### 📁 **Organize Pages**
+- **Preview Mode**: Toggle between text list and visual thumbnail grid views of PDF pages
 - **Visual & Text-based Interface**: Reorder PDF pages with intuitive drag-and-drop or text-based controls
+- **Live Preview**: See page thumbnails with drag-and-drop reordering and real-time drop indicators
 - **Remove & Restore**: Temporarily remove pages and restore them as needed
 - **Smart Status**: Real-time feedback on changes made to your document
-- **Flexible Controls**: Move pages up/down, drag-and-drop reordering, or use keyboard shortcuts
+- **Persistent Preferences**: Preview mode state saves automatically across sessions
 
 ### 🔗 **Merge PDFs**
 - **Multi-file Selection**: Add multiple PDF files with a simple file browser
@@ -36,9 +38,10 @@ SoPDF provides three powerful PDF management tools in one clean, intuitive inter
 
 SoPDF features a modern dark theme with clean, intuitive controls:
 - **Tabbed Interface**: Three main tabs for different operations
+- **Dual View Modes**: Switch between text lists and visual thumbnail grids
 - **Responsive Design**: Adapts to different window sizes
 - **Modern UI**: Built with CustomTkinter for a sleek, native feel
-- **Accessibility**: Clear fonts, good contrast, and logical navigation
+- **Smart Persistence**: Window size, position, and view preferences automatically saved
 
 ## 📋 Requirements
 
@@ -52,7 +55,7 @@ SoPDF features a modern dark theme with clean, intuitive controls:
 customtkinter>=5.2.0    # Modern GUI framework
 PyPDF2>=3.0.0          # PDF manipulation library
 Pillow>=9.0.0          # Image processing
-pdf2image>=1.16.0      # PDF to image conversion (for previews)
+PyMuPDF>=1.23.0        # Pure Python PDF rendering for preview mode
 ```
 
 ## 🛠 Installation
@@ -96,12 +99,12 @@ Both commands launch the same application. `run.py` is the streamlined entry poi
 
 #### Organizing PDF Pages
 1. **Select PDF**: Click "📁 Select PDF File" in the Organize tab
-2. **Reorder Pages**: 
-   - Drag and drop pages in the list
-   - Use ⬆️⬇️ buttons to move selected pages
-   - Double-click pages for preview
-3. **Remove/Restore**: Right-click pages or use the ❌/↶ buttons
-4. **Save**: Click "💾 Save Organized PDF" when satisfied
+2. **Choose View**: Toggle "🖼️ Preview Mode" for visual thumbnails or use text list
+3. **Reorder Pages**: 
+   - **Preview Mode**: Drag page thumbnails with real-time drop indicators
+   - **Text Mode**: Drag and drop in list or use ⬆️⬇️ buttons
+4. **Remove/Restore**: Right-click pages or use the ❌/↶ buttons
+5. **Save**: Click "💾 Save Organized PDF" when satisfied
 
 #### Merging PDFs
 1. **Add Files**: Click "➕Add PDF Files" to select multiple PDFs
@@ -242,6 +245,7 @@ If you encounter any issues or have questions:
 
 - **CustomTkinter**: For the modern, beautiful GUI framework
 - **PyPDF2**: For reliable PDF processing capabilities
+- **PyMuPDF**: For pure Python PDF rendering and preview generation
 - **PIL/Pillow**: For image processing support
 
 ---
