@@ -133,6 +133,17 @@ class SplitTab:
             width=40
         )
         self.split_value_label.grid(row=0, column=2, padx=(10, 0), pady=10)
+
+        # Split point entry (new)
+        self.split_entry = ctk.CTkEntry(
+            split_control_frame,
+            width=60,
+            state="disabled"
+        )
+        self.split_entry.grid(row=0, column=3, padx=(10, 0), pady=10)
+        self.split_entry.insert(0, "1")
+        self.split_entry.bind("<Return>", self.on_split_entry)
+        self.split_entry.bind("<FocusOut>", self.on_split_entry)
         
         # Preview frame
         preview_frame = ctk.CTkFrame(settings_frame)
@@ -197,7 +208,9 @@ class SplitTab:
                 self.split_slider.configure(state="normal", from_=1, to=page_count-1, number_of_steps=page_count-2)
                 self.split_slider.set(1)
                 self.split_btn.configure(state="normal")
-                
+                self.split_entry.configure(state="normal")
+                self.split_entry.delete(0, "end")
+                self.split_entry.insert(0, "1")
                 # Update preview
                 self.update_split_preview(1)
                 
@@ -216,12 +229,19 @@ class SplitTab:
         self.split_btn.configure(state="disabled")
         self.preview_label.configure(text="Select a PDF file to preview split", text_color="gray")
         self.split_value_label.configure(text="1")
+        self.split_entry.configure(state="disabled")
+        self.split_entry.delete(0, "end")
+        self.split_entry.insert(0, "1")
     
     def update_split_preview(self, value):
         """Update the split preview based on slider value"""
         if self.split_pdf_path and self.split_pdf_pages > 0:
             split_page = int(float(value))
             self.split_value_label.configure(text=str(split_page))
+            # Sync entry if needed
+            if self.split_entry.get() != str(split_page):
+                self.split_entry.delete(0, "end")
+                self.split_entry.insert(0, str(split_page))
             
             # Update preview text
             preview_text = (
@@ -230,6 +250,22 @@ class SplitTab:
                 f"📄 Part 2: Pages {split_page + 1}-{self.split_pdf_pages} ({self.split_pdf_pages - split_page} pages)"
             )
             self.preview_label.configure(text=preview_text, text_color="lightblue")
+    
+    def on_split_entry(self, event):
+        if not self.split_pdf_path or self.split_pdf_pages < 2:
+            return
+        try:
+            value = int(self.split_entry.get())
+            if value < 1:
+                value = 1
+            if value > self.split_pdf_pages - 1:
+                value = self.split_pdf_pages - 1
+            self.split_slider.set(value)
+            self.update_split_preview(value)
+        except Exception:
+            # Reset to slider value if invalid
+            self.split_entry.delete(0, "end")
+            self.split_entry.insert(0, str(int(self.split_slider.get())))
     
     def split_pdf(self):
         """Split the selected PDF file"""
