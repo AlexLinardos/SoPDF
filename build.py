@@ -108,21 +108,25 @@ def build_executable():
         '--hidden-import=PIL._tkinter_finder',
         '--hidden-import=fitz',
         
-        # Exclude only obviously unnecessary modules (safe exclusions)
-        '--exclude-module=tkinter.test',
-        '--exclude-module=test',
-        '--exclude-module=unittest',
-        '--exclude-module=pydoc',
-        '--exclude-module=doctest',
-        
-        # Development/debugging tools (safe to exclude)
-        '--exclude-module=pdb',
-        '--exclude-module=profile',
-        '--exclude-module=cProfile',
+        # CONSERVATIVE MODULE EXCLUSIONS - Only absolutely safe modules
+        '--exclude-module=tkinter.test',        # Tkinter test suite
+        '--exclude-module=test',                # Python test suite
+        '--exclude-module=unittest',            # Unit testing framework
+        '--exclude-module=pydoc',               # Documentation generator
+        '--exclude-module=doctest',             # Documentation testing
+        '--exclude-module=pdb',                 # Python debugger
         
         # Clearly unused GUI modules
-        '--exclude-module=turtle',
-        '--exclude-module=turtledemo',
+        '--exclude-module=turtle',              # Turtle graphics
+        '--exclude-module=turtledemo',          # Turtle demos
+        '--exclude-module=idlelib',             # IDLE IDE components
+        
+        # Third-party frameworks definitely not needed
+        '--exclude-module=pytest',              # Third-party testing
+        '--exclude-module=nose',                # Third-party testing
+        '--exclude-module=flask',               # Web framework
+        '--exclude-module=django',              # Web framework
+        '--exclude-module=tornado',             # Web framework
         
         # Entry point
         'run.py'
