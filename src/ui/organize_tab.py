@@ -8,7 +8,6 @@ import os
 import tkinter as tk
 import customtkinter as ctk
 from tkinter import filedialog, messagebox, simpledialog
-from PyPDF2 import PdfReader, PdfWriter
 import fitz  # PyMuPDF
 import io
 from PIL import Image
@@ -208,22 +207,21 @@ class OrganizeTab:
                 self.organize_file_info.configure(text="Loading PDF...", text_color="orange")
                 self.app.root.update()
                 
-                # Read PDF to get pages
-                reader = PdfReader(file_path)
-                page_count = len(reader.pages)
+                # Open PDF with PyMuPDF 
+                self.pdf_document = fitz.open(file_path)
+                page_count = self.pdf_document.page_count
                 
                 if page_count < 1:
                     messagebox.showwarning("Warning", "PDF file appears to be empty.")
+                    self.pdf_document.close()
                     return
                 
                 # Set up organize variables
                 self.organize_pdf_path = file_path
-                self.organize_pages = reader.pages
+                # With PyMuPDF, we don't store page objects, just work with page indices
+                self.organize_pages = list(range(page_count))  # Store page indices instead
                 self.organize_page_order = list(range(page_count))  # [0, 1, 2, ...]
                 self.removed_pages = set()
-                
-                # Open PDF with PyMuPDF for preview mode
-                self.pdf_document = fitz.open(file_path)
                 self.page_thumbnails = {}  # Clear thumbnail cache
                 self.preview_widgets = {}  # Clear widget cache
                 
@@ -917,14 +915,15 @@ class OrganizeTab:
         
         try:
             # Create new PDF with organized pages
-            writer = PdfWriter()
+            output_doc = fitz.open()
             
             for page_idx in active_pages:
-                writer.add_page(self.organize_pages[page_idx])
+                # Insert individual page from source document
+                output_doc.insert_pdf(self.pdf_document, from_page=page_idx, to_page=page_idx)
             
             # Save the organized PDF
-            with open(output_file, 'wb') as output_pdf:
-                writer.write(output_pdf)
+            output_doc.save(output_file)
+            output_doc.close()
             
             # Show success message
             total_original = len(self.organize_pages)

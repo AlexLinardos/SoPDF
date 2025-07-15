@@ -8,7 +8,7 @@ import os
 import tkinter as tk
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
-from PyPDF2 import PdfReader, PdfWriter
+import fitz  # PyMuPDF
 
 
 class MergeTab:
@@ -277,22 +277,25 @@ class MergeTab:
             return
         
         try:
-            # Create a PDF writer object
-            writer = PdfWriter()
+            # Create a new empty PDF document
+            merged_doc = fitz.open()
             
             # Add pages from each PDF
             for pdf_path in self.pdf_files:
                 try:
-                    reader = PdfReader(pdf_path)
-                    for page in reader.pages:
-                        writer.add_page(page)
+                    # Open source document
+                    source_doc = fitz.open(pdf_path)
+                    # Insert all pages from source into merged document
+                    merged_doc.insert_pdf(source_doc)
+                    source_doc.close()
                 except Exception as e:
                     messagebox.showerror("Error", f"Error reading {os.path.basename(pdf_path)}:\n{str(e)}")
+                    merged_doc.close()
                     return
             
-            # Write the merged PDF
-            with open(output_file, 'wb') as output_pdf:
-                writer.write(output_pdf)
+            # Save the merged PDF
+            merged_doc.save(output_file)
+            merged_doc.close()
             
             # Show success message
             messagebox.showinfo(

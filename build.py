@@ -8,7 +8,6 @@ import os
 import sys
 import shutil
 import subprocess
-from pathlib import Path
 
 def clean_build():
     """Clean previous build artifacts"""
@@ -73,7 +72,7 @@ def check_dependencies():
         print(f"   ✅ PyInstaller {PyInstaller.__version__} installed")
     
     # Check other dependencies
-    dependencies = ['customtkinter', 'PyPDF2', 'PIL', 'fitz']
+    dependencies = ['customtkinter', 'PIL', 'fitz']
     for dep in dependencies:
         try:
             __import__(dep)
@@ -107,7 +106,6 @@ def build_executable():
         '--hidden-import=customtkinter',
         '--hidden-import=PIL',
         '--hidden-import=PIL._tkinter_finder',
-        '--hidden-import=PyPDF2',
         '--hidden-import=fitz',
         
         # Exclude only obviously unnecessary modules (safe exclusions)
@@ -191,7 +189,7 @@ def show_build_info():
         print(f"\n💡 Distribution notes:")
         print(f"   • The .exe file is standalone and doesn't require Python")
         print(f"   • No external dependencies required - fully self-contained")
-        print(f"   • PDF processing uses PyPDF2 + PyMuPDF libraries")
+        print(f"   • PDF processing uses PyMuPDF library")
         print(f"   • Preview mode included with pure Python PDF rendering")
     else:
         print("\n❌ Build failed - executable not found")

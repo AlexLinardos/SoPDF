@@ -7,7 +7,7 @@ This module contains the PDF splitting functionality.
 import os
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
-from PyPDF2 import PdfReader, PdfWriter
+import fitz  # PyMuPDF
 
 
 class SplitTab:
@@ -186,8 +186,9 @@ class SplitTab:
         if file_path:
             try:
                 # Read PDF to get page count
-                reader = PdfReader(file_path)
-                page_count = len(reader.pages)
+                doc = fitz.open(file_path)
+                page_count = doc.page_count
+                doc.close()
                 
                 if page_count < 2:
                     messagebox.showwarning("Warning", "PDF must have at least 2 pages to split.")
@@ -287,28 +288,28 @@ class SplitTab:
             return
         
         try:
-            # Read the original PDF
-            reader = PdfReader(self.split_pdf_path)
+            # Open the original PDF
+            source_doc = fitz.open(self.split_pdf_path)
             
             # Create first part (pages 1 to split_page)
-            writer1 = PdfWriter()
-            for i in range(split_page):
-                writer1.add_page(reader.pages[i])
+            part1_doc = fitz.open()
+            part1_doc.insert_pdf(source_doc, from_page=0, to_page=split_page-1)
             
             # Create second part (pages split_page+1 to end)
-            writer2 = PdfWriter()
-            for i in range(split_page, len(reader.pages)):
-                writer2.add_page(reader.pages[i])
+            part2_doc = fitz.open()
+            part2_doc.insert_pdf(source_doc, from_page=split_page, to_page=source_doc.page_count-1)
             
             # Save both parts
             part1_path = os.path.join(save_dir, f"{base_name}_part1.pdf")
             part2_path = os.path.join(save_dir, f"{base_name}_part2.pdf")
             
-            with open(part1_path, 'wb') as output1:
-                writer1.write(output1)
+            part1_doc.save(part1_path)
+            part1_doc.close()
             
-            with open(part2_path, 'wb') as output2:
-                writer2.write(output2)
+            part2_doc.save(part2_path)
+            part2_doc.close()
+            
+            source_doc.close()
             
             # Show success message
             messagebox.showinfo(
