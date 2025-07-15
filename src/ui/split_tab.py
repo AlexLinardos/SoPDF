@@ -5,9 +5,10 @@ This module contains the PDF splitting functionality.
 """
 
 import os
+import io
 
 # Use lazy loading for UI libraries
-from src.utils.lazy_ui import ctk, tk
+from src.utils.lazy_ui import ctk, tk, pil
 
 # Import other modules normally
 import fitz  # PyMuPDF
@@ -23,6 +24,8 @@ class SplitTab:
         # Initialize split-related variables
         self.split_pdf_path = None
         self.split_pdf_pages = 0
+        self.pdf_document = None  # PyMuPDF document for preview
+        self.page_thumbnails = {}  # Cache for page thumbnails
         
         self.setup_split_tab()
     
@@ -148,17 +151,62 @@ class SplitTab:
         self.split_entry.bind("<Return>", self.on_split_entry)
         self.split_entry.bind("<FocusOut>", self.on_split_entry)
         
-        # Preview frame
+        # Preview frame - now with both text and visual preview
         preview_frame = ctk.CTkFrame(settings_frame)
         preview_frame.grid(row=2, column=0, columnspan=3, padx=20, pady=10, sticky="ew")
+        preview_frame.grid_columnconfigure(0, weight=1)
+        preview_frame.grid_columnconfigure(1, weight=1)
+        
+        # Left side - text preview
+        text_preview_frame = ctk.CTkFrame(preview_frame)
+        text_preview_frame.grid(row=0, column=0, padx=(10, 5), pady=10, sticky="nsew")
+        
+        text_preview_title = ctk.CTkLabel(
+            text_preview_frame,
+            text="📄 Split Preview",
+            font=ctk.CTkFont(size=14, weight="bold")
+        )
+        text_preview_title.grid(row=0, column=0, padx=10, pady=(10, 5))
         
         self.preview_label = ctk.CTkLabel(
-            preview_frame,
+            text_preview_frame,
             text="Select a PDF file to preview split",
-            font=ctk.CTkFont(size=14),
+            font=ctk.CTkFont(size=12),
             text_color="gray"
         )
-        self.preview_label.grid(row=0, column=0, padx=20, pady=15)
+        self.preview_label.grid(row=1, column=0, padx=10, pady=(5, 10))
+        
+        # Right side - visual page preview
+        visual_preview_frame = ctk.CTkFrame(preview_frame)
+        visual_preview_frame.grid(row=0, column=1, padx=(5, 10), pady=10, sticky="nsew")
+        
+        visual_preview_title = ctk.CTkLabel(
+            visual_preview_frame,
+            text="🖼️ Page Preview",
+            font=ctk.CTkFont(size=14, weight="bold")
+        )
+        visual_preview_title.grid(row=0, column=0, padx=10, pady=(10, 5))
+        
+        # Page thumbnail display
+        self.page_thumbnail_label = ctk.CTkLabel(
+            visual_preview_frame,
+            text="No page to preview",
+            font=ctk.CTkFont(size=12),
+            text_color="gray",
+            width=140,
+            height=160
+        )
+        self.page_thumbnail_label.grid(row=1, column=0, padx=10, pady=(5, 5))
+        
+        # Page info label
+        self.page_info_label = ctk.CTkLabel(
+            visual_preview_frame,
+            text="",
+            font=ctk.CTkFont(size=11),
+            text_color="lightblue",
+            height=20
+        )
+        self.page_info_label.grid(row=2, column=0, padx=10, pady=(0, 10))
         
         # Split action frame
         action_frame = ctk.CTkFrame(settings_frame)
@@ -178,6 +226,42 @@ class SplitTab:
         )
         self.split_btn.grid(row=0, column=1, padx=20, pady=20)
     
+    def generate_page_thumbnail(self, page_index, size=(120, 160)):
+        """Generate a thumbnail image for a PDF page using PyMuPDF"""
+        cache_key = f"{page_index}_{size[0]}x{size[1]}"
+        if cache_key in self.page_thumbnails:
+            return self.page_thumbnails[cache_key]
+        
+        try:
+            # Get page from PyMuPDF document
+            page = self.pdf_document[page_index]
+            
+            # Render page to image
+            zoom = min(size[0] / page.rect.width, size[1] / page.rect.height)
+            mat = fitz.Matrix(zoom, zoom)
+            pix = page.get_pixmap(matrix=mat)
+            
+            # Convert to PIL Image
+            img_data = pix.tobytes("ppm")
+            pil_image = pil.Image.open(io.BytesIO(img_data))
+            
+            # Resize to exact thumbnail size
+            pil_image = pil_image.resize(size, pil.Image.Resampling.LANCZOS)
+            
+            # Convert to CTkImage for better HighDPI support
+            ctk_image = ctk.CTkImage(light_image=pil_image, dark_image=pil_image, size=size)
+            
+            # Cache the thumbnail
+            self.page_thumbnails[cache_key] = ctk_image
+            
+            return ctk_image
+        
+        except Exception as e:
+            print(f"Error generating thumbnail for page {page_index}: {e}")
+            # Return a placeholder image
+            placeholder = pil.Image.new('RGB', size, color='lightgray')
+            return ctk.CTkImage(light_image=placeholder, dark_image=placeholder, size=size)
+    
     def select_pdf_for_split(self):
         """Select a PDF file for splitting"""
         file_types = [("PDF files", "*.pdf"), ("All files", "*.*")]
@@ -188,17 +272,25 @@ class SplitTab:
         
         if file_path:
             try:
+                # Close previous document if open
+                if self.pdf_document:
+                    self.pdf_document.close()
+                
                 # Read PDF to get page count
-                doc = fitz.open(file_path)
-                page_count = doc.page_count
-                doc.close()
+                self.pdf_document = fitz.open(file_path)
+                page_count = self.pdf_document.page_count
                 
                 if page_count < 2:
                     tk.messagebox.showwarning("Warning", "PDF must have at least 2 pages to split.")
+                    self.pdf_document.close()
+                    self.pdf_document = None
                     return
                 
                 self.split_pdf_path = file_path
                 self.split_pdf_pages = page_count
+                
+                # Clear thumbnail cache
+                self.page_thumbnails = {}
                 
                 # Update UI
                 filename = os.path.basename(file_path)
@@ -220,11 +312,20 @@ class SplitTab:
                 
             except Exception as e:
                 tk.messagebox.showerror("Error", f"Error reading PDF file:\n{str(e)}")
+                if self.pdf_document:
+                    self.pdf_document.close()
+                    self.pdf_document = None
     
     def clear_split_file(self):
         """Clear the selected PDF file"""
+        # Close PDF document
+        if self.pdf_document:
+            self.pdf_document.close()
+            self.pdf_document = None
+        
         self.split_pdf_path = None
         self.split_pdf_pages = 0
+        self.page_thumbnails = {}  # Clear thumbnail cache
         
         # Update UI
         self.file_info_label.configure(text="No file selected", text_color="gray")
@@ -232,6 +333,8 @@ class SplitTab:
         self.split_slider.configure(state="disabled")
         self.split_btn.configure(state="disabled")
         self.preview_label.configure(text="Select a PDF file to preview split", text_color="gray")
+        self.page_thumbnail_label.configure(image=None, text="No page to preview", text_color="gray")
+        self.page_info_label.configure(text="")
         self.split_value_label.configure(text="1")
         self.split_entry.configure(state="disabled")
         self.split_entry.delete(0, "end")
@@ -239,7 +342,7 @@ class SplitTab:
     
     def update_split_preview(self, value):
         """Update the split preview based on slider value"""
-        if self.split_pdf_path and self.split_pdf_pages > 0:
+        if self.split_pdf_path and self.split_pdf_pages > 0 and self.pdf_document:
             split_page = int(float(value))
             self.split_value_label.configure(text=str(split_page))
             # Sync entry if needed
@@ -247,13 +350,43 @@ class SplitTab:
                 self.split_entry.delete(0, "end")
                 self.split_entry.insert(0, str(split_page))
             
-            # Update preview text
+            # Update text preview
             preview_text = (
-                f"Split Preview:\n\n"
-                f"📄 Part 1: Pages 1-{split_page} ({split_page} pages)\n"
-                f"📄 Part 2: Pages {split_page + 1}-{self.split_pdf_pages} ({self.split_pdf_pages - split_page} pages)"
+                f"📄 Part 1: Pages 1-{split_page}\n"
+                f"    ({split_page} pages)\n\n"
+                f"📄 Part 2: Pages {split_page + 1}-{self.split_pdf_pages}\n"
+                f"    ({self.split_pdf_pages - split_page} pages)"
             )
             self.preview_label.configure(text=preview_text, text_color="lightblue")
+            
+            # Update visual preview - show the page after which we'll split
+            try:
+                page_thumbnail = self.generate_page_thumbnail(split_page - 1)  # 0-based index
+                
+                # Update thumbnail
+                self.page_thumbnail_label.configure(
+                    image=page_thumbnail,
+                    text="",
+                    compound="top"
+                )
+                
+                # Update page info
+                self.page_info_label.configure(
+                    text=f"Page {split_page}\n(Split after this page)",
+                    text_color="lightblue"
+                )
+                
+            except Exception as e:
+                print(f"Error updating page preview: {e}")
+                self.page_thumbnail_label.configure(
+                    image=None,
+                    text=f"Page {split_page}\n(Preview error)",
+                    text_color="orange"
+                )
+                self.page_info_label.configure(
+                    text="Preview error",
+                    text_color="orange"
+                )
     
     def on_split_entry(self, event):
         if not self.split_pdf_path or self.split_pdf_pages < 2:

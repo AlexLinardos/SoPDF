@@ -7,7 +7,6 @@ This is the main application class that coordinates all the UI modules.
 import os
 import sys
 import json
-from typing import Optional, Any
 
 # Import lazy UI utilities instead of direct imports
 from src.utils.lazy_ui import ctk, tk, pil, lazy_tabs
