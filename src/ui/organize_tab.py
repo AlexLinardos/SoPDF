@@ -5,12 +5,13 @@ This module contains the PDF page organization functionality.
 """
 
 import os
-import tkinter as tk
-import customtkinter as ctk
-from tkinter import filedialog, messagebox, simpledialog
-import fitz  # PyMuPDF
 import io
-from PIL import Image
+
+# Use lazy loading for UI libraries
+from src.utils.lazy_ui import ctk, tk, pil
+
+# Import other modules normally
+import fitz  # PyMuPDF
 
 
 class OrganizeTab:
@@ -196,7 +197,7 @@ class OrganizeTab:
     def select_pdf_for_organize(self):
         """Select a PDF file for text-based organizing"""
         file_types = [("PDF files", "*.pdf"), ("All files", "*.*")]
-        file_path = filedialog.askopenfilename(
+        file_path = tk.filedialog.askopenfilename(
             title="Select PDF file to organize",
             filetypes=file_types
         )
@@ -212,7 +213,7 @@ class OrganizeTab:
                 page_count = self.pdf_document.page_count
                 
                 if page_count < 1:
-                    messagebox.showwarning("Warning", "PDF file appears to be empty.")
+                    tk.messagebox.showwarning("Warning", "PDF file appears to be empty.")
                     self.pdf_document.close()
                     return
                 
@@ -255,7 +256,7 @@ class OrganizeTab:
                 self.update_organize_status()
                 
             except Exception as e:
-                messagebox.showerror("Error", f"Error reading PDF file:\n{str(e)}")
+                tk.messagebox.showerror("Error", f"Error reading PDF file:\n{str(e)}")
     
     def apply_saved_preview_state(self):
         """Apply saved preview mode state when PDF is loaded"""
@@ -415,10 +416,10 @@ class OrganizeTab:
             
             # Convert to PIL Image
             img_data = pix.tobytes("ppm")
-            pil_image = Image.open(io.BytesIO(img_data))
+            pil_image = pil.Image.open(io.BytesIO(img_data))
             
             # Resize to exact thumbnail size
-            pil_image = pil_image.resize(size, Image.Resampling.LANCZOS)
+            pil_image = pil_image.resize(size, pil.Image.Resampling.LANCZOS)
             
             # Convert to CTkImage for better HighDPI support
             ctk_image = ctk.CTkImage(light_image=pil_image, dark_image=pil_image, size=size)
@@ -431,7 +432,7 @@ class OrganizeTab:
         except Exception as e:
             print(f"Error generating thumbnail for page {page_index}: {e}")
             # Return a placeholder image
-            placeholder = Image.new('RGB', size, color='lightgray')
+            placeholder = pil.Image.new('RGB', size, color='lightgray')
             return ctk.CTkImage(light_image=placeholder, dark_image=placeholder, size=size)
     
     def update_preview_display(self):
@@ -766,7 +767,7 @@ class OrganizeTab:
     def preview_remove_page(self, page_idx):
         """Remove a page in preview mode"""
         original_page_num = page_idx + 1
-        result = messagebox.askyesno(
+        result = tk.messagebox.askyesno(
             "Remove Page",
             f"Remove page {original_page_num}?\n\nThis can be undone by right-clicking the removed page."
         )
@@ -837,7 +838,7 @@ class OrganizeTab:
         if not self.organize_pdf_path:
             return
         
-        result = messagebox.askyesno(
+        result = tk.messagebox.askyesno(
             "Reset Order", 
             "Reset all changes and restore original page order?\n\nThis will undo all reordering and restore all removed pages."
         )
@@ -891,19 +892,19 @@ class OrganizeTab:
     def save_organized_pdf(self):
         """Save the organized PDF with reordered/removed pages"""
         if not self.organize_pdf_path:
-            messagebox.showwarning("Warning", "Please select a PDF file first.")
+            tk.messagebox.showwarning("Warning", "Please select a PDF file first.")
             return
         
         # Get active pages in current order
         active_pages = [idx for idx in self.organize_page_order if idx not in self.removed_pages]
         
         if not active_pages:
-            messagebox.showwarning("Warning", "Cannot save PDF with no pages. Please restore at least one page.")
+            tk.messagebox.showwarning("Warning", "Cannot save PDF with no pages. Please restore at least one page.")
             return
         
         # Ask user where to save
         base_name = os.path.splitext(os.path.basename(self.organize_pdf_path))[0]
-        output_file = filedialog.asksaveasfilename(
+        output_file = tk.filedialog.asksaveasfilename(
             title="Save organized PDF as...",
             defaultextension=".pdf",
             initialfile=f"{base_name}_organized.pdf",
@@ -939,15 +940,15 @@ class OrganizeTab:
             
             success_msg += f"\nSaved as: {os.path.basename(output_file)}"
             
-            messagebox.showinfo("Success", success_msg)
+            tk.messagebox.showinfo("Success", success_msg)
             
             # Ask if user wants to clear the current file
-            response = messagebox.askyesno("Clear File", "Would you like to clear the current file and start over?")
+            response = tk.messagebox.askyesno("Clear File", "Would you like to clear the current file and start over?")
             if response:
                 self.clear_organize_file()
                 
         except Exception as e:
-            messagebox.showerror("Error", f"Error saving organized PDF:\n{str(e)}")
+            tk.messagebox.showerror("Error", f"Error saving organized PDF:\n{str(e)}")
     
     # Text-based organize interface methods
     def update_text_organize_display(self):
@@ -1180,7 +1181,7 @@ class OrganizeTab:
             original_page_num = page_to_remove + 1
             
             # Confirm removal
-            result = messagebox.askyesno(
+            result = tk.messagebox.askyesno(
                 "Remove Page", 
                 f"Remove page {index + 1} (originally page {original_page_num})?\n\nThis can be undone with 'Restore Page'."
             )
@@ -1211,7 +1212,7 @@ class OrganizeTab:
             )
             
             try:
-                choice = simpledialog.askinteger(
+                choice = tk.simpledialog.askinteger(
                     "Restore Page",
                     dialog_text + f"\n\nEnter number (1-{len(page_options)}):",
                     minvalue=1,

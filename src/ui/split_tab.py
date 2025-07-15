@@ -5,8 +5,11 @@ This module contains the PDF splitting functionality.
 """
 
 import os
-import customtkinter as ctk
-from tkinter import filedialog, messagebox
+
+# Use lazy loading for UI libraries
+from src.utils.lazy_ui import ctk, tk
+
+# Import other modules normally
 import fitz  # PyMuPDF
 
 
@@ -178,7 +181,7 @@ class SplitTab:
     def select_pdf_for_split(self):
         """Select a PDF file for splitting"""
         file_types = [("PDF files", "*.pdf"), ("All files", "*.*")]
-        file_path = filedialog.askopenfilename(
+        file_path = tk.filedialog.askopenfilename(
             title="Select PDF file to split",
             filetypes=file_types
         )
@@ -191,7 +194,7 @@ class SplitTab:
                 doc.close()
                 
                 if page_count < 2:
-                    messagebox.showwarning("Warning", "PDF must have at least 2 pages to split.")
+                    tk.messagebox.showwarning("Warning", "PDF must have at least 2 pages to split.")
                     return
                 
                 self.split_pdf_path = file_path
@@ -216,7 +219,7 @@ class SplitTab:
                 self.update_split_preview(1)
                 
             except Exception as e:
-                messagebox.showerror("Error", f"Error reading PDF file:\n{str(e)}")
+                tk.messagebox.showerror("Error", f"Error reading PDF file:\n{str(e)}")
     
     def clear_split_file(self):
         """Clear the selected PDF file"""
@@ -271,7 +274,7 @@ class SplitTab:
     def split_pdf(self):
         """Split the selected PDF file"""
         if not self.split_pdf_path:
-            messagebox.showwarning("Warning", "Please select a PDF file first.")
+            tk.messagebox.showwarning("Warning", "Please select a PDF file first.")
             return
         
         split_page = int(self.split_slider.get())
@@ -280,7 +283,7 @@ class SplitTab:
         base_name = os.path.splitext(os.path.basename(self.split_pdf_path))[0]
         
         # Get directory to save files
-        save_dir = filedialog.askdirectory(
+        save_dir = tk.filedialog.askdirectory(
             title="Select folder to save split PDF files"
         )
         
@@ -312,7 +315,7 @@ class SplitTab:
             source_doc.close()
             
             # Show success message
-            messagebox.showinfo(
+            tk.messagebox.showinfo(
                 "Success",
                 f"PDF successfully split!\n\n"
                 f"Part 1: {os.path.basename(part1_path)} ({split_page} pages)\n"
@@ -321,9 +324,9 @@ class SplitTab:
             )
             
             # Ask if user wants to clear the current file
-            response = messagebox.askyesno("Clear File", "Would you like to clear the current file and start over?")
+            response = tk.messagebox.askyesno("Clear File", "Would you like to clear the current file and start over?")
             if response:
                 self.clear_split_file()
                 
         except Exception as e:
-            messagebox.showerror("Error", f"Error splitting PDF:\n{str(e)}") 
+            tk.messagebox.showerror("Error", f"Error splitting PDF:\n{str(e)}") 

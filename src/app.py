@@ -7,15 +7,10 @@ This is the main application class that coordinates all the UI modules.
 import os
 import sys
 import json
-import tkinter as tk
-import customtkinter as ctk
-from tkinter import messagebox
-from PIL import Image
+from typing import Optional, Any
 
-# Import our modular components
-from src.ui.organize_tab import OrganizeTab
-from src.ui.merge_tab import MergeTab
-from src.ui.split_tab import SplitTab
+# Import lazy UI utilities instead of direct imports
+from src.utils.lazy_ui import ctk, tk, pil, lazy_tabs
 from src.utils.file_utils import get_asset_path
 
 
@@ -23,11 +18,9 @@ class SoPDFApp:
     """Main SoPDF Application class"""
     
     def __init__(self):
-        # Set appearance mode and color theme
-        ctk.set_appearance_mode("dark")  # "light" or "dark" or "system"
-        ctk.set_default_color_theme("blue")  # "blue", "green", "dark-blue"
+        # Don't configure Custom Tkinter here - it will be done lazily
         
-        # Create main window
+        # Create main window using lazy loader
         self.root = ctk.CTk()
         self.root.title("SoPDF")
         
@@ -50,10 +43,16 @@ class SoPDFApp:
         self.root.grid_columnconfigure(0, weight=1)
         self.root.grid_rowconfigure(0, weight=1)
         
-        # Initialize tab references
+        # Initialize tab references - these will be loaded lazily
         self.organize_tab_instance = None
         self.merge_tab_instance = None
         self.split_tab_instance = None
+        
+        # Initialize page organization variables (needed by organize tab)
+        self.organize_page_order = []
+        self.removed_pages = set()
+        self.page_thumbnails = []
+        self.drag_data = {"x": 0, "y": 0, "item": None}
         
         # Setup UI and restore window state
         self.setup_ui()
@@ -76,7 +75,7 @@ class SoPDFApp:
             if os.path.exists(png_path):
                 try:
                     # Convert PNG to ICO if ICO doesn't exist
-                    png_image = Image.open(png_path)
+                    png_image = pil.Image.open(png_path)
                     # Resize to standard icon sizes and save as ICO
                     png_image.save(ico_path, format='ICO', sizes=[(16,16), (32,32), (48,48), (64,64)])
                     print("Created ICO file from PNG")
@@ -93,22 +92,73 @@ class SoPDFApp:
             print(f"Could not set window icon: {e}")
     
     def setup_ui(self):
-        """Setup the main user interface"""
+        """Setup the main user interface with lazy tab loading"""
         # Create tabview directly in root (no extra container needed)
         self.tabview = ctk.CTkTabview(self.root)
         self.tabview.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
         
-        # Add tabs
+        # Add tabs but don't initialize their content yet
         organize_tab_frame = self.tabview.add("Organize")
         merge_tab_frame = self.tabview.add("Merge")
         split_tab_frame = self.tabview.add("Split")
         
-        # Setup individual tabs using the modular classes
-        self.organize_tab_instance = OrganizeTab(organize_tab_frame, self)
-        self.merge_tab_instance = MergeTab(merge_tab_frame, self)
-        self.split_tab_instance = SplitTab(split_tab_frame, self)
+        # Register tabs for lazy loading
+        lazy_tabs.set_app_reference(self)
+        
+        # Import tab classes only when registering (not when creating instances)
+        from src.ui.organize_tab import OrganizeTab
+        from src.ui.merge_tab import MergeTab
+        from src.ui.split_tab import SplitTab
+        
+        lazy_tabs.register_tab("Organize", OrganizeTab, organize_tab_frame)
+        lazy_tabs.register_tab("Merge", MergeTab, merge_tab_frame)
+        lazy_tabs.register_tab("Split", SplitTab, split_tab_frame)
+        
+        # Bind tab change event to handle lazy loading
+        self.tabview.configure(command=self.on_tab_change)
+        
+        # Load the default tab (Organize) immediately for better UX
+        self.load_tab_if_needed("Organize")
     
-
+    def on_tab_change(self):
+        """Handle tab change events to load tabs lazily"""
+        current_tab = self.tabview.get()
+        self.load_tab_if_needed(current_tab)
+    
+    def load_tab_if_needed(self, tab_name: str):
+        """Load a tab's content if it hasn't been loaded yet"""
+        if not lazy_tabs.is_tab_loaded(tab_name):
+            # Load the tab content
+            tab_instance = lazy_tabs.get_tab(tab_name)
+            
+            # Store references for backwards compatibility
+            if tab_name == "Organize":
+                self.organize_tab_instance = tab_instance
+            elif tab_name == "Merge":
+                self.merge_tab_instance = tab_instance
+            elif tab_name == "Split":
+                self.split_tab_instance = tab_instance
+    
+    # Methods needed by organize tab for backwards compatibility
+    def select_thumbnail(self, thumbnail):
+        """Select a thumbnail (called by organize tab)"""
+        if self.organize_tab_instance:
+            self.organize_tab_instance.select_thumbnail(thumbnail)
+    
+    def restore_specific_page(self, page_index):
+        """Restore a specific page (called by organize tab)"""
+        if self.organize_tab_instance:
+            self.organize_tab_instance.restore_specific_page(page_index)
+    
+    def remove_specific_page(self, page_index):
+        """Remove a specific page (called by organize tab)"""
+        if self.organize_tab_instance:
+            self.organize_tab_instance.remove_specific_page(page_index)
+    
+    def move_page_to_position(self, source_index, target_index):
+        """Move a page to a new position (called by organize tab)"""
+        if self.organize_tab_instance:
+            self.organize_tab_instance.move_page_to_position(source_index, target_index)
     
     def run(self):
         """Start the application"""
@@ -155,7 +205,7 @@ class SoPDFApp:
                 "height": self.root.winfo_height(),
                 "x": self.root.winfo_x(),
                 "y": self.root.winfo_y(),
-                "organize_preview_mode": self.organize_tab_instance.preview_mode if self.organize_tab_instance else False
+                "organize_preview_mode": getattr(self.organize_tab_instance, 'preview_mode', False) if self.organize_tab_instance else False
             }
             
             state_file = self.get_state_file_path()
@@ -214,6 +264,8 @@ def main():
         print("\nApplication interrupted by user")
         sys.exit(0)
     except Exception as e:
+        # Import messagebox only when needed
+        from tkinter import messagebox
         messagebox.showerror("Error", f"An error occurred: {str(e)}")
         sys.exit(1)
 

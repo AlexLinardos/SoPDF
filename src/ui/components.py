@@ -4,9 +4,8 @@ UI Components for SoPDF
 This module contains reusable UI components like thumbnails and widgets.
 """
 
-import tkinter as tk
-import customtkinter as ctk
-from PIL import Image
+# Use lazy loading for UI libraries
+from src.utils.lazy_ui import ctk, tk, pil
 
 
 class PageThumbnail(ctk.CTkFrame):
@@ -26,7 +25,7 @@ class PageThumbnail(ctk.CTkFrame):
         
         # Create thumbnail image
         thumbnail_size = (120, 160)
-        page_image.thumbnail(thumbnail_size, Image.Resampling.LANCZOS)
+        page_image.thumbnail(thumbnail_size, pil.Image.Resampling.LANCZOS)
         
         # Convert to CTkImage
         self.tk_image = ctk.CTkImage(light_image=page_image, dark_image=page_image, size=thumbnail_size)

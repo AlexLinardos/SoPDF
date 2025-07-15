@@ -5,9 +5,11 @@ This module contains the PDF merging functionality.
 """
 
 import os
-import tkinter as tk
-import customtkinter as ctk
-from tkinter import filedialog, messagebox
+
+# Use lazy loading for UI libraries
+from src.utils.lazy_ui import ctk, tk
+
+# Import other modules normally
 import fitz  # PyMuPDF
 
 
@@ -170,7 +172,7 @@ class MergeTab:
     def add_pdf_files(self):
         """Add PDF files to the merge list"""
         file_types = [("PDF files", "*.pdf"), ("All files", "*.*")]
-        files = filedialog.askopenfilenames(
+        files = tk.filedialog.askopenfilenames(
             title="Select PDF files to merge",
             filetypes=file_types
         )
@@ -263,11 +265,11 @@ class MergeTab:
     def merge_pdfs(self):
         """Merge selected PDF files"""
         if len(self.pdf_files) < 2:
-            messagebox.showwarning("Warning", "Please select at least 2 PDF files to merge.")
+            tk.messagebox.showwarning("Warning", "Please select at least 2 PDF files to merge.")
             return
         
         # Ask user where to save the merged file
-        output_file = filedialog.asksaveasfilename(
+        output_file = tk.filedialog.asksaveasfilename(
             title="Save merged PDF as...",
             defaultextension=".pdf",
             filetypes=[("PDF files", "*.pdf"), ("All files", "*.*")]
@@ -289,7 +291,7 @@ class MergeTab:
                     merged_doc.insert_pdf(source_doc)
                     source_doc.close()
                 except Exception as e:
-                    messagebox.showerror("Error", f"Error reading {os.path.basename(pdf_path)}:\n{str(e)}")
+                    tk.messagebox.showerror("Error", f"Error reading {os.path.basename(pdf_path)}:\n{str(e)}")
                     merged_doc.close()
                     return
             
@@ -298,15 +300,15 @@ class MergeTab:
             merged_doc.close()
             
             # Show success message
-            messagebox.showinfo(
+            tk.messagebox.showinfo(
                 "Success", 
                 f"Successfully merged {len(self.pdf_files)} PDF files!\n\nSaved as: {os.path.basename(output_file)}"
             )
             
             # Optionally clear the list after successful merge
-            response = messagebox.askyesno("Clear List", "Would you like to clear the file list?")
+            response = tk.messagebox.askyesno("Clear List", "Would you like to clear the file list?")
             if response:
                 self.clear_all_files()
                 
         except Exception as e:
-            messagebox.showerror("Error", f"Error merging PDFs:\n{str(e)}") 
+            tk.messagebox.showerror("Error", f"Error merging PDFs:\n{str(e)}") 
